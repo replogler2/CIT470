@@ -1,0 +1,176 @@
+#! /bin/bash
+
+################################################################################
+# Help                                                                         #
+################################################################################
+Help()
+{
+   # Display Help
+   echo "This script is designed to install LDAP on your server"
+   echo
+   echo "Syntax: scriptTemplate [-h]"
+   echo "options:"
+   echo "h     Print this Help."
+   echo
+}
+
+################################################################################
+################################################################################
+# Code                                                                         #
+################################################################################
+################################################################################
+
+#### HELP Code ###############
+while getopts ":h" option; do
+   case $option in
+      h) # display Help
+         Help
+         exit;;
+   esac
+done
+
+## initialize log file
+touch ldap-install-log
+
+## Install open ldap server and client software
+echo "Beginning LDAP Server and Client Install" >> ldap-install-log
+yum install openldap-servers openldap-clients -y | tee -a ldap-install-log
+echo "Finished LDAP Server and Client Install" >> ldap-install-log
+
+## Configure /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif file
+
+echo "begin configuration of ldap files" >> ldap-install-log
+
+echo "# AUTO-GENERATED FILE - DO NOT EDIT!! Use ldapmodify." > /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "# CRC32 066d6379" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "dn: olcDatabase={2}hdb" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "objectClass: olcDatabaseConfig" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "objectClass: olcHdbConfig" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "olcDatabase: {2}hdb" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "olcDbDirectory: /var/lib/ldap" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "olcSuffix: dc=cit470,dc=nku,dc=edu" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "olcRootDN: cn=Manager,dc=cit470,dc=nku,dc=edu" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "olcRootPW: {SSHA}RY9um529b2W5zeBCQdeihUU9BOJt3o7d" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "olcAccess: {0}to attrs=userPassword, by self write by anonymous auth by * none" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "olcAccess: {1} to * by self write by * read" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "olcDbIndex: objectClass eq,pres" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "olcDbIndex: ou,cn,mail,surname,givenname eq,pres,sub" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "structuralObjectClass: olcHdbConfig" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "entryUUID: 0d24a5c8-5b42-103b-90dd-f99ad300a1d6" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "creatorsName: cn=config" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "createTimestamp: 20210606183754Z" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "entryCSN: 20210606183754.740338Z#000000#000#000000" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "modifiersName: cn=config" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+echo "modifyTimestamp: 20210606183754Z" >> /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif | tee -a /ldap-install-log
+
+echo "End configuration of ldap configuration files" >> ldap-install-log
+
+## configure ldap to start automatically
+
+echo "Begin starting LDAP and configuring LDAP for auto start" | tee -a ldap-install-log 
+
+systemctl start slapd.service | tee -a ldap-install-log
+systemctl enable slapd | tee -a ldap-install-log
+
+echo "End starting LDAP and configuring LDAP for auto start" | tee -a ldap-install-log 
+
+## configure firewall ports for LDAP
+
+echo "Begin Firewall port configuration for LDAP" | tee -a ldap-install-log
+
+firewall-cmd --zone=public --add-port=389/tcp --permanent | tee -a ldap-install-log
+firewall-cmd --zone=public --add-port=636/tcp --permanent | tee -a ldap-install-log
+
+echo "restarting firewall service after port additions" | tee -a ldap-install-log
+
+firewall-cmd --reload | tee -a ldap-install-log
+
+echo "End firewall configuration" | tee -a ldap-install-log
+
+## begin Configuration of LDAP Directory
+
+echo "Begin Configuration of LDAP Directory" | tee -a ldap-install-log
+
+echo "Create DB_Config File" | tee -a ldap-install-log
+
+cp /usr/share/openldap-servers/DB_CONFIG.example /var/lib/ldap/DB_CONFIG | tee -a ldap-install-log
+chown -R ldap:ldap /var/lib/ldap | tee -a ldap-install-log
+
+echo "Install necessary tools for configuration of LDAP directory" | tee -a ldap-install-log
+
+yum install nss_ldap migrationtools -y | tee -a ldap-install-log
+
+echo "Finished Install of necessary tools for configuration of LDAP directory" | tee -a ldap-install-log
+
+echo "download updated pre-configured files for LDAP directory" | tee -a ldap-install-log
+
+cp /usr/share/migrationtools/migrate_common.ph /usr/share/migrationtools/migrate_common.BAK
+rm /usr/share/migrationtools/migrate_common.ph
+
+wget https://raw.githubusercontent.com/replogler2/CIT470/main/migrate_common.ph | tee -a ldap-install-log
+
+cp ./migrate_common.ph /usr/share/migrationtools/migrate_common.ph | tee -a ldap-install-log
+
+echo "finished downloading updated pre-configuration files" | tee -a ldap-install-log
+
+echo "create base of LDAP tree" | tee -a ldap-install-log
+
+touch /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+chown +R ldap:ldap /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+
+echo "dn: dc=cit470,dc=nku,dc=edu" >> /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+echo "dc: cit470" >> /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+echo "objectClass: top" >> /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+echo "objectClass: domain" >> /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+echo "dn: ou=People,dc=cit470,dc=nku,dc=edu" >> /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+echo "ou: People" >> /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+echo "objectClass: top" >> /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+echo "objectClass: organizationalUnit" >> /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+echo "dn: ou=Group,dc=cit470,dc=nku,dc=edu" >> /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+echo "ou: Group" >> /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+echo "objectClass: top" >> /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+echo "objectClass: organizationalUnit" >> /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+
+echo "finished creating base.ldif file" | tee -a ldap-install-log
+
+## configuring LDAP Schema
+
+echo "configuring LDAP Schema" | tee -a ldap-install-log
+
+ldapadd -Y EXTERNAL -H ldapi:// -f /etc/openldap/schema/core.ldif | tee -a ldap-install-log
+ldapadd -Y EXTERNAL -H ldapi:// -f /etc/openldap/schema/cosine.ldif | tee -a ldap-install-log
+ldapadd -Y EXTERNAL -H ldapi:// -f /etc/openldap/schema/nis.ldif | tee -a ldap-install-log
+ldapadd -Y EXTERNAL -H ldapi:// -f /etc/openldap/schema/inetorgperson.ldif | tee -a ldap-install-log
+
+systemctl stop slapd.service | tee -a ldap-install-log
+chown -R ldap:ldap /var/lib/ldap | tee -a ldap-install-log
+
+slapadd -v -l /usr/share/migrationtools/base.ldif | tee -a ldap-install-log
+
+echo "Starting Migration of /etc/passwd and /etc/group" | tee -a ldap-install-log
+
+/usr/share/migrationtools/migrate_passwd.pl /etc/passwd > /usr/share/migrationtools/passwd.ldif | tee -a ldap-install-log
+slapadd -v -l /usr/share/migrationtools/passwd.ldif | tee -a ldap-install-log
+/usr/share/migrationtools/migrate_group.pl /etc/group > /usr/share/migrationtools/group.ldif | tee -a ldap-install-log
+slapadd -v -l /usr/share/migrationtools/group.ldif | tee -a ldap-install-log
+
+chown -R ldap:ldap /var/lib/ldap | tee -a ldap-install-log
+
+echo "Finished migration of /etc/passwd and /etc/group" | tee -a ldap-install-log
+
+systemctl start slapd.service | tee -a ldap-install-log
+
+echo "finished configuring LDAP Schema" | tee -a ldap-install-log
+
+## Install DIRADM tools
+
+echo "Installing DIRADM Tools" | tee -a ldap-install-log
+
+wget http://www.hits.at/diradm/diradm-1.3.tar.gz | tee -a ldap-install-log
+tar zxvf diradm-1.3.tar.gz | tee -a ldap-install-log
+cp -R ./diradm-1.3 /usr/local | tee -a ldap-install-log
+wget https://raw.githubusercontent.com/replogler2/CIT470/main/diradm.conf | tee -a ldap-install-log
+cp ./diradm.conf /etc/diradm.conf | tee -a ldap-install-log
+
+echo "Finished installing DIRADM TOOLS" | tee -a ldap-install-log
+echo "Finished Install-LDAP-script" | tee -a ldap-install-log
